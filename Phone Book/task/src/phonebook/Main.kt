@@ -10,6 +10,7 @@ fun main() {
 
     linearSearch(directory, namesToFind)
     jumpSearch(directory, namesToFind)
+    binarySearch(directory, namesToFind)
 }
 
 fun loadDirectory(): MutableList<Record> {
@@ -45,7 +46,17 @@ fun jumpSearch(directory: MutableList<Record>, namesToFind: List<String>): List<
     print("Sorting time: ${JumpSearcher.sortingTime.toTime()}")
     if (JumpSearcher.stopped) print(" - STOPPED, moved to linear search")
     println()
-    print("Searching time: ${JumpSearcher.searchingTime.toTime()}\n")
+    println("Searching time: ${JumpSearcher.searchingTime.toTime()}\n")
+    return foundRecords
+}
+
+fun binarySearch(directory: MutableList<Record>, namesToFind: List<String>): List<Record> {
+    println("Start searching (quick sort + binary search)...")
+    val foundRecords = BinarySearcher.search(directory, namesToFind)
+    print("Found ${foundRecords.size} / ${namesToFind.size} entries. ")
+    println("Time taken: ${BinarySearcher.elapsedTime.toTime()}")
+    println("Sorting time: ${BinarySearcher.sortingTime.toTime()}")
+    println("Searching time: ${BinarySearcher.searchingTime.toTime()}\n")
     return foundRecords
 }
 
@@ -122,6 +133,63 @@ object JumpSearcher {
             if (System.currentTimeMillis() - startTime > timeLimit) return true
         }
         return false
+    }
+}
+
+object BinarySearcher {
+    var sortingTime = 0L
+    var searchingTime = 0L
+    var elapsedTime = 0L
+
+    fun search(records: MutableList<Record>, namesToFind: List<String>): List<Record> {
+        val startTime = System.currentTimeMillis()
+        quickSort(records)
+        sortingTime = System.currentTimeMillis() - startTime
+        val found = searchInSorted(records, namesToFind)
+        elapsedTime = System.currentTimeMillis() - startTime
+        searchingTime = elapsedTime - sortingTime
+        return found
+    }
+
+    private fun searchInSorted(records: List<Record>, namesToFind: List<String>): List<Record> {
+        val found = mutableListOf<Record>()
+        for (name in namesToFind) {
+            var left = 0
+            var right = records.lastIndex
+            loop@ while (left <= right) {
+                val middle = (left + right) / 2
+                when {
+                    records[middle].name < name -> left = middle + 1
+                    records[middle].name > name -> right = middle - 1
+                    else -> {
+                        found.add(records[middle])
+                        break@loop
+                    }
+                }
+            }
+        }
+        return found
+    }
+
+    private fun quickSort(records: MutableList<Record>, low: Int = 0, high: Int = records.lastIndex) {
+        if (low < high) {
+            val p = partition(records, low, high)
+            quickSort(records, low, p - 1)
+            quickSort(records, p + 1, high)
+        }
+    }
+
+    private fun partition(records: MutableList<Record>, low: Int, high: Int): Int {
+        val pivot = records[high].name
+        var i = low
+        for (j in low..high) {
+            if (records[j].name < pivot) {
+                Collections.swap(records, i, j)
+                i++
+            }
+        }
+        Collections.swap(records, i, high)
+        return i
     }
 }
 
