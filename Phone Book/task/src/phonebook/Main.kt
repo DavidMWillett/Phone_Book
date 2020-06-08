@@ -10,7 +10,8 @@ const val directoryFile = "C:\\Users\\david\\IdeaProjects\\Data\\directory.txt"
 enum class SearchType(val searcher: Searcher, val notification: String) {
     LINEAR(LinearSearcher,"Start searching (linear search)..."),
     JUMP(JumpSearcher,"Start searching (bubble sort + jump search)..."),
-    BINARY(BinarySearcher,"Start searching (quick sort + binary search)...")
+    BINARY(BinarySearcher,"Start searching (quick sort + binary search)..."),
+    HASH(HashSearcher, "Start searching (hash table)...")
 }
 
 fun main() {
@@ -20,6 +21,7 @@ fun main() {
     directory.search(namesToFind, SearchType.LINEAR)
     directory.search(namesToFind, SearchType.JUMP, 10 * LinearSearcher.elapsedTime)
     directory.search(namesToFind, SearchType.BINARY)
+    directory.search(namesToFind, SearchType.HASH)
 }
 
 class Directory {
@@ -45,7 +47,8 @@ class Directory {
         print("Found $found / $total entries. ")
         println("Time taken: ${searcher.elapsedTime.toTime()}")
         if (searcher !is LinearSearcher) {
-            print("Sorting time: ${searcher.sortingTime.toTime()}")
+            print(if (searcher is HashSearcher) "Creating time: " else "Sorting time: ")
+            print(searcher.setupTime.toTime())
             if (searcher is JumpSearcher && searcher.stopped) {
                 print(" - STOPPED, moved to linear search")
             }
@@ -79,14 +82,14 @@ object JumpSearcher : Searcher() {
     override fun search(records: MutableList<Record>, namesToFind: List<String>, timeLimit: Long): List<Record> {
         val startTime = System.currentTimeMillis()
         stopped = bubbleSort(records, timeLimit)
-        sortingTime = System.currentTimeMillis() - startTime
+        setupTime = System.currentTimeMillis() - startTime
         val found = (if (!stopped) {
             searchInSorted(records, namesToFind)
         } else {
             LinearSearcher.search(records, namesToFind)
         })
         elapsedTime = System.currentTimeMillis() - startTime
-        searchingTime = elapsedTime - sortingTime
+        searchingTime = elapsedTime - setupTime
         return found
     }
 
@@ -129,10 +132,10 @@ object BinarySearcher : Searcher() {
     override fun search(records: MutableList<Record>, namesToFind: List<String>, timeLimit: Long): List<Record> {
         val startTime = System.currentTimeMillis()
         quickSort(records)
-        sortingTime = System.currentTimeMillis() - startTime
+        setupTime = System.currentTimeMillis() - startTime
         val found = searchInSorted(records, namesToFind)
         elapsedTime = System.currentTimeMillis() - startTime
-        searchingTime = elapsedTime - sortingTime
+        searchingTime = elapsedTime - setupTime
         return found
     }
 
@@ -178,9 +181,33 @@ object BinarySearcher : Searcher() {
     }
 }
 
+object HashSearcher : Searcher() {
+    override fun search(records: MutableList<Record>, namesToFind: List<String>, timeLimit: Long): List<Record> {
+        val startTime = System.currentTimeMillis()
+        val found = mutableListOf<Record>()
+        val hashTable = createHashTable(records)
+        setupTime = System.currentTimeMillis() - startTime
+        for (name in namesToFind) {
+            val number = hashTable[name]
+            if (number != null) found.add(number)
+        }
+        elapsedTime = System.currentTimeMillis() - startTime
+        searchingTime = elapsedTime - setupTime
+        return found
+    }
+
+    private fun createHashTable(records: List<Record>): HashMap<String, Record> {
+        val hashTable = HashMap<String, Record>()
+        for (record in records) {
+            hashTable[record.name] = record
+        }
+        return hashTable
+    }
+}
+
 abstract class Searcher {
     var elapsedTime = 0L
-    var sortingTime = 0L
+    var setupTime = 0L
     var searchingTime = 0L
     var stopped = false
 
