@@ -4,68 +4,62 @@ import java.io.File
 import java.util.Collections
 import kotlin.math.sqrt
 
+const val findFile = "C:\\Users\\david\\IdeaProjects\\Data\\find.txt"
+const val directoryFile = "C:\\Users\\david\\IdeaProjects\\Data\\directory.txt"
+
+enum class SearchType(val searcher: Searcher, val notification: String) {
+    LINEAR(LinearSearcher,"Start searching (linear search)..."),
+    JUMP(JumpSearcher,"Start searching (bubble sort + jump search)..."),
+    BINARY(BinarySearcher,"Start searching (quick sort + binary search)...")
+}
+
 fun main() {
-    val directory = loadDirectory()
-    val namesToFind = loadNamesToFind()
+    val namesToFind = File(findFile).readLines()
+    val directory = Directory()
 
-    linearSearch(directory, namesToFind)
-    jumpSearch(directory, namesToFind)
-    binarySearch(directory, namesToFind)
+    directory.search(namesToFind, SearchType.LINEAR)
+    directory.search(namesToFind, SearchType.JUMP, 10 * LinearSearcher.elapsedTime)
+    directory.search(namesToFind, SearchType.BINARY)
 }
 
-fun loadDirectory(): MutableList<Record> {
-    val filePath = "C:\\Users\\david\\IdeaProjects\\Data\\directory.txt"
-    val records = mutableListOf<Record>()
-    File(filePath).forEachLine {
-        val (number, name) = it.split(" ", limit = 2)
-        records.add(Record(number, name))
+class Directory {
+    private val records = loadDirectory()
+
+    private fun loadDirectory(): MutableList<Record> {
+        val records = mutableListOf<Record>()
+        File(directoryFile).forEachLine {
+            val (number, name) = it.split(" ", limit = 2)
+            records.add(Record(number, name))
+        }
+        return records
     }
-    return records
+
+    fun search(namesToFind: List<String>, searchType: SearchType, timeLimit: Long = 0): List<Record> {
+        println(searchType.notification)
+        val foundRecords = searchType.searcher.search(records, namesToFind, timeLimit)
+        printStats(searchType.searcher, foundRecords.size, namesToFind.size)
+        return foundRecords
+    }
+
+    private fun printStats(searcher: Searcher, found: Int, total: Int) {
+        print("Found $found / $total entries. ")
+        println("Time taken: ${searcher.elapsedTime.toTime()}")
+        if (searcher !is LinearSearcher) {
+            print("Sorting time: ${searcher.sortingTime.toTime()}")
+            if (searcher is JumpSearcher && searcher.stopped) {
+                print(" - STOPPED, moved to linear search")
+            }
+            println()
+            println("Searching time: ${searcher.searchingTime.toTime()}")
+        }
+        println()
+    }
+
+    private fun Long.toTime() = "${this / 60_000} min. ${this / 1_000 % 60} sec. ${this % 1_000} ms."
 }
 
-fun loadNamesToFind(): List<String> {
-    val filePath = "C:\\Users\\david\\IdeaProjects\\Data\\find.txt"
-    val names = mutableListOf<String>()
-    File(filePath).forEachLine { names.add(it) }
-    return names
-}
-
-fun linearSearch(directory: List<Record>, namesToFind: List<String>): List<Record> {
-    println("Start searching (linear search)...")
-    val foundRecords = LinearSearcher.search(directory, namesToFind)
-    print("Found ${foundRecords.size} / ${namesToFind.size} entries. ")
-    println("Time taken: ${LinearSearcher.elapsedTime.toTime()}\n")
-    return foundRecords
-}
-
-fun jumpSearch(directory: MutableList<Record>, namesToFind: List<String>): List<Record> {
-    println("Start searching (bubble sort + jump search)...")
-    val foundRecords = JumpSearcher.search(directory, namesToFind, 10 * LinearSearcher.elapsedTime)
-    print("Found ${foundRecords.size} / ${namesToFind.size} entries. ")
-    println("Time taken: ${JumpSearcher.elapsedTime.toTime()}")
-    print("Sorting time: ${JumpSearcher.sortingTime.toTime()}")
-    if (JumpSearcher.stopped) print(" - STOPPED, moved to linear search")
-    println()
-    println("Searching time: ${JumpSearcher.searchingTime.toTime()}\n")
-    return foundRecords
-}
-
-fun binarySearch(directory: MutableList<Record>, namesToFind: List<String>): List<Record> {
-    println("Start searching (quick sort + binary search)...")
-    val foundRecords = BinarySearcher.search(directory, namesToFind)
-    print("Found ${foundRecords.size} / ${namesToFind.size} entries. ")
-    println("Time taken: ${BinarySearcher.elapsedTime.toTime()}")
-    println("Sorting time: ${BinarySearcher.sortingTime.toTime()}")
-    println("Searching time: ${BinarySearcher.searchingTime.toTime()}\n")
-    return foundRecords
-}
-
-fun Long.toTime() = "${this / 60_000} min. ${this / 1_000 % 60} sec. ${this % 1_000} ms."
-
-object LinearSearcher {
-    var elapsedTime: Long = 0
-
-    fun search(records: List<Record>, namesToFind: List<String>): List<Record> {
+object LinearSearcher : Searcher() {
+    override fun search(records: MutableList<Record>, namesToFind: List<String>, timeLimit: Long): List<Record> {
         val found = mutableListOf<Record>()
         val startTime = System.currentTimeMillis()
         for (name in namesToFind) {
@@ -81,13 +75,8 @@ object LinearSearcher {
     }
 }
 
-object JumpSearcher {
-    var elapsedTime = 0L
-    var sortingTime = 0L
-    var searchingTime = 0L
-    var stopped = false
-
-    fun search(records: MutableList<Record>, namesToFind: List<String>, timeLimit: Long): List<Record> {
+object JumpSearcher : Searcher() {
+    override fun search(records: MutableList<Record>, namesToFind: List<String>, timeLimit: Long): List<Record> {
         val startTime = System.currentTimeMillis()
         stopped = bubbleSort(records, timeLimit)
         sortingTime = System.currentTimeMillis() - startTime
@@ -136,12 +125,8 @@ object JumpSearcher {
     }
 }
 
-object BinarySearcher {
-    var sortingTime = 0L
-    var searchingTime = 0L
-    var elapsedTime = 0L
-
-    fun search(records: MutableList<Record>, namesToFind: List<String>): List<Record> {
+object BinarySearcher : Searcher() {
+    override fun search(records: MutableList<Record>, namesToFind: List<String>, timeLimit: Long): List<Record> {
         val startTime = System.currentTimeMillis()
         quickSort(records)
         sortingTime = System.currentTimeMillis() - startTime
@@ -191,6 +176,15 @@ object BinarySearcher {
         Collections.swap(records, i, high)
         return i
     }
+}
+
+abstract class Searcher {
+    var elapsedTime = 0L
+    var sortingTime = 0L
+    var searchingTime = 0L
+    var stopped = false
+
+    abstract fun search(records: MutableList<Record>, namesToFind: List<String>, timeLimit: Long = 0): List<Record>
 }
 
 data class Record(val number: String, val name: String)
