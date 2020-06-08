@@ -53,7 +53,7 @@ class Directory {
                 print(" - STOPPED, moved to linear search")
             }
             println()
-            println("Searching time: ${searcher.searchingTime.toTime()}")
+            println("Searching time: ${(searcher.elapsedTime - searcher.setupTime).toTime()}")
         }
         println()
     }
@@ -89,7 +89,6 @@ object JumpSearcher : Searcher() {
             LinearSearcher.search(records, namesToFind)
         })
         elapsedTime = System.currentTimeMillis() - startTime
-        searchingTime = elapsedTime - setupTime
         return found
     }
 
@@ -135,7 +134,6 @@ object BinarySearcher : Searcher() {
         setupTime = System.currentTimeMillis() - startTime
         val found = searchInSorted(records, namesToFind)
         elapsedTime = System.currentTimeMillis() - startTime
-        searchingTime = elapsedTime - setupTime
         return found
     }
 
@@ -192,7 +190,6 @@ object HashSearcher : Searcher() {
             if (number != null) found.add(number)
         }
         elapsedTime = System.currentTimeMillis() - startTime
-        searchingTime = elapsedTime - setupTime
         return found
     }
 
@@ -208,7 +205,6 @@ object HashSearcher : Searcher() {
 abstract class Searcher {
     var elapsedTime = 0L
     var setupTime = 0L
-    var searchingTime = 0L
     var stopped = false
 
     abstract fun search(records: MutableList<Record>, namesToFind: List<String>, timeLimit: Long = 0): List<Record>
